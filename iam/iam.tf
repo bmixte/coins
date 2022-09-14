@@ -3,10 +3,6 @@
 resource "aws_iam_user" "prod-ci-user" {
   name = "prod-ci-user"
 
-  tags = {
-    generatedBy = "terraform"
-    environment = "production"
-  }
 }
 
 resource "aws_iam_group" "prod-ci-group" {
@@ -37,11 +33,6 @@ resource "aws_iam_role" "prod-ci-role" {
       },
     ]
   })
-
-  tags = {
-    generatedBy = "terraform"
-    environment = "production"
-  }
 }
 
 resource "aws_iam_role_policy" "prod-ci-policy" {
