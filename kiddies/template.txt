@@ -1,0 +1,5 @@
+# !/bin/bash
+
+echo "Launch Monitor for ##ENV##"
+curl -v "https://##URL##"
+

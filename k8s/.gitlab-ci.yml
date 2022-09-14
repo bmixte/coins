@@ -1,0 +1,49 @@
+stages:
+  - build
+  - anchore_scan
+  - push_stable
+  - deploy
+
+variables:
+  ANCHORE_FAIL_ON_POLICY: "true"
+  
+before_script:
+  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+
+build:
+  stage: build
+  tags:
+    - gitlab-demo
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:dev .   
+    - docker push $CI_REGISTRY_IMAGE:dev
+
+anchore_scan:
+  stage: anchore_scan
+  tags:
+    - gitlab-demo
+  script:
+    - ANCHORE_CLI_URL_BASE=$(dig +short myip.opendns.com @resolver1.opendns.com | tr '.' '-')
+    - ANCHORE_CLI_URL="http://ec2-${ANCHORE_CLI_URL_BASE}.${ANCHORE_CLI_URL_REGION}.compute.amazonaws.com:8228/v1"
+    - echo $ANCHORE_CLI_URL
+    - docker run -e ANCHORE_CLI_URL=$ANCHORE_CLI_URL anchore/engine-cli anchore-cli system status
+    - docker run -e ANCHORE_CLI_URL=$ANCHORE_CLI_URL anchore/engine-cli anchore-cli image add $CI_REGISTRY_IMAGE:dev
+    - docker run -e ANCHORE_CLI_URL=$ANCHORE_CLI_URL anchore/engine-cli anchore-cli image wait $CI_REGISTRY_IMAGE:dev
+    - if [ "${ANCHORE_FAIL_ON_POLICY}" == "true" ] ; then docker run -e ANCHORE_CLI_URL=$ANCHORE_CLI_URL anchore/engine-cli anchore-cli  evaluate check $CI_REGISTRY_IMAGE:dev --detail; fi
+
+push_stable:
+  stage: push_stable
+  tags:
+    - gitlab-demo
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:prod .
+    - docker push $CI_REGISTRY_IMAGE:prod
+
+deploy:
+  image:
+    name: bitnami/kubectl:latest
+    entrypoint: ['']
+  script:
+    - kubectl config get-contexts
+    - kubectl config use-context path/to/agent/repository:agent-name
+    - kubectl apply -f statefulset.yaml
